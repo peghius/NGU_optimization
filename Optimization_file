@@ -1,7 +1,8 @@
 import datetime as dt
 import pandas as pd
 import numpy as np
-
+import seaborn as sns
+import matplotlib as plt
 
 class Augments:
 
@@ -23,20 +24,15 @@ class Augments:
         self.GPS = gps
 
     def show_stats(self):
-        return print("{} speed factor, {} cap, {} GPS".format("{}".format(self.speed), self.cap, self.GPS))
+        return print("{} speed factor, {} cap, {} GPS".format(self.speed, self.cap, self.GPS))
 
-    # aug_gold_increase = base_cost * level
-    # aug_time_increase  = base_time * level * (1000  / allocated energy) / speed_factor
-    # upg_gold_increase = base_cost * level**2
-    # upg_power_multiplier = 1 + level**2
-
-    def augment_progress(self, aug_choice, energy, days=0, hours=0, minutes=0, seconds=0):
+    def augment_progress(self, aug_choice, energy, hours=0, minutes=0, timeframe=1):
         level = 1
         total_time = dt.timedelta()
-        delta = dt.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+        delta = dt.timedelta(hours=hours, minutes=minutes)
         speed_counter = dt.timedelta()
-        dataframe_counter = dt.timedelta(minutes=1)
-        dataframe_counter_base = dt.timedelta(minutes=1)
+        dataframe_counter = dt.timedelta(minutes=timeframe)
+        dataframe_counter_base = dt.timedelta(minutes=timeframe)
         second = dt.timedelta(seconds=1)
         limit = "yes"
         dataset = pd.DataFrame(columns=["time", "cost", "level", "power"])
@@ -62,22 +58,23 @@ class Augments:
                     limit = "no"
         return dataset
 
-    def upgrade_progress(self, aug_choice, energy, days=0, hours=0, minutes=0, seconds=0):
+    def upgrade_progress(self, aug_choice, energy, hours=0, minutes=0, timeframe=1):
         level = 1
         total_time = dt.timedelta()
-        delta = dt.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+        delta = dt.timedelta(hours=hours, minutes=minutes)
         speed_counter = dt.timedelta()
-        dataframe_counter = dt.timedelta(minutes=1)
-        dataframe_counter_base = dt.timedelta(minutes=1)
+        dataframe_counter = dt.timedelta(minutes=timeframe)
+        dataframe_counter_base = dt.timedelta(minutes=timeframe)
         second = dt.timedelta(seconds=1)
         limit = "yes"
-        dataset = pd.DataFrame(columns=["time", "cost", "level", "power"])
+        dataset = pd.DataFrame(columns=["time", "up_cost", "up_level", "bonus"])
         total_cost = 0
+        print(total_cost)
         while total_time <= delta:
             time_spent = (dt.timedelta(seconds=Augments.augments["base_time"]["{}".format(aug_choice)]) * level
                           * (1000 / energy) / self.speed)
             total_time += time_spent
-            next_cost = Augments.augments.base_cost["{}".format(aug_choice)] ** level * 0.5
+            next_cost = (Augments.augments.base_cost["{}".format(aug_choice)] * level**2) * 0.5
             total_cost = total_cost + next_cost
             level += 1
             multiplier = 1 + level**2
@@ -93,5 +90,31 @@ class Augments:
                 elif (level % 50) == 0 and speed_counter>second:
                     limit = "no"
         return dataset
+
+    @staticmethod
+    def combine(dataset1, dataset2):
+        dataset2 = dataset2.drop(columns="time")
+        dataset = pd.concat([dataset1, dataset2], axis=1)
+        dataset["tot_power"] = dataset1.power * dataset2.bonus
+        dataset["tot_gold"] = dataset1.cost + dataset2.up_cost
+        return dataset
+
+    @staticmethod
+    def graph_single(dataset):
+        plot = sns.lineplot(x="time", y="tot_power", data=dataset)
+        plot2 = sns.lineplot(x="time", y="tot_gold", data=dataset)
+        return plt.pyplot.show()
+
+
+start = dt.datetime.today()
+run = Augments(2578000, 302285994, 1*10**20)
+
+scissors = run.augment_progress("scissors", 150000000, hours=1, timeframe=5)
+scissors_up = run.upgrade_progress("scissors_up", 150000000, hours=1, timeframe=5)
+combination = Augments.combine(scissors, scissors_up)
+combination.to_csv(r"C:\Users\lucaf\Desktop\NGU_Optimization\Test_dataset.csv")
+plot = Augments.graph_single(combination)
+
+print(combination)
 
 
